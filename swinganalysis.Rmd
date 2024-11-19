@@ -1,0 +1,164 @@
+---
+title: "swinganalysis"
+author: "Derek Maldonado"
+date: '2024-11-13'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+#necessary libraries
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+library(tidyselect)
+library(tibble)
+library(interactions)
+library(arm)
+library(readxl)
+
+```
+
+things I need for this
+(from bat tracking)
+swings_competitive
+contact
+avg bat spd
+hard swing rate
+squared up per swing
+blast per swing
+squared up per contact
+blast per contact
+swing length
+sword
+whiff
+
+(from expected stats)
+pa
+ball in play
+ba
+xba
+slg
+xslg
+woba
+xwoba
+
+(from exit velo)
+avg angle
+max hit speed
+avg hit speed
+max distance
+avg distance
+avg hr distance
+barrels
+brl percent per batted ball event
+brl percent per pa
+
+(from basics one)
+ab
+pa
+1b
+2b
+3b
+hr
+so
+bb
+avg
+slg
+obp
+ops
+iso
+babip
+
+
+
+```{r}
+battracking <- read.csv("C:/Users/eazyd/OneDrive/Desktop/writing stuff/baseballwriting/bat-tracking_7_9.csv",header = TRUE)
+basicstats <- read.csv("C:/Users/eazyd/OneDrive/Desktop/writing stuff/baseballwriting/stats.csv",header = TRUE)
+exitvelo <- read.csv("C:/Users/eazyd/OneDrive/Desktop/writing stuff/baseballwriting/exit_velocity_7_9.csv",header = TRUE)
+xstats <- read.csv("C:/Users/eazyd/OneDrive/Desktop/writing stuff/baseballwriting/expected_stats_7_9.csv",header = TRUE)
+
+IDCHECK <- data.frame(
+ID = c(basicstats$player_id,
+battracking$ï..id,
+exitvelo$player_id,
+xstats$player_id)
+)
+numIDs <- table(IDCHECK$ID)
+
+usableids <- as.integer(names(numIDs[numIDs == 4]))
+## 137 usable players
+
+basicstatsfilt <- basicstats %>% filter(player_id %in% usableids)
+battrackingfilt <- battracking %>% filter(ï..id %in% usableids)
+exitvelofilt <- exitvelo %>% filter(player_id %in% usableids)
+xstatsfilt <- xstats %>% filter(player_id %in% usableids)
+
+
+```
+
+clean it up
+
+```{r}
+
+basicsfinal <- basicstatsfilt %>%
+dplyr::select("ï..name", "ab", "pa", "single", "double", "triple", "home_run", "strikeout", "walk", "batting_avg", "slg_percent", "on_base_percent", "isolated_power", "babip")
+
+battrackingfinal <- battrackingfilt %>%
+dplyr::select("name", "swings_competitive", "contact", "avg_bat_speed", "hard_swing_rate", "squared_up_per_swing","squared_up_per_bat_contact", "blast_per_swing", "blast_per_bat_contact", "swing_length", "swords", "whiffs","whiff_per_swing")
+
+exitvelofinal <- exitvelofilt %>%
+dplyr::select("ï..name","avg_hit_angle", "avg_hit_speed","avg_distance","max_hit_speed","max_distance", "avg_hr_distance", "barrels","brl_percent","brl_pa")
+
+xstatsfinal <- xstatsfilt %>%
+dplyr::select("ï..name","bip","est_ba","est_slg", "woba","est_woba")
+
+namechange <- c("name", "ab", "pa", "1b", "2b", "3b","hr","k","bb","ba","slg","obp","iso","babip")
+
+names(basicsfinal) <- namechange
+
+namechange2 <- c("name", "competetiveswing", "contact", "avgbatspeed", "hardswingrate", "sqperswing", "sqpercontact", "blastperswing", "blastpercontact", "swinglength", "swords", "whiffs", "whiffsperswing")
+
+namechange3 <- c("name", "avgangle", "avgspeedoffbat", "avgdistance", "maxspeedoffbat", "maxdistance", "avghrdistance", "barrels", "brlperbattedball", "brlperpa")
+
+namechange4 <- c("name", "ballsinplay", "xba", "xslg", "woba", "xwoba")
+
+names(battrackingfinal) <- namechange2
+names(exitvelofinal) <- namechange3
+names(xstatsfinal) <- namechange4
+
+a <- basicsfinal %>%
+inner_join(xstatsfinal, by = c("name"))
+b <- a %>%
+inner_join(battrackingfinal, by = c("name"))
+battingfinal <- b %>%
+inner_join(exitvelofinal, by = c("name"))
+
+
+```
+
+analysis done easy
+
+```{r}
+
+spdvslength <- ggplot(battingfinal,aes(x=avgbatspeed, y=swinglength)) + geom_point(aes(colour = slg+obp)) + geom_text(aes(label=name),size= 5/.pt) + scale_color_gradient(low= "green", high= "red") + geom_smooth(method = 'lm')
+
+spdvsavgdistance <- ggplot(battingfinal,aes(x=avgbatspeed, y=avghrdistance)) + geom_point(aes(colour= hr)) + geom_text(aes(label=name),size= 5/.pt) + scale_color_gradient(low= "green", high= "red")
+
+spdvscontact <- ggplot(battingfinal, aes(x=avgbatspeed, y=contact)) + geom_point(aes(colour= k)) + geom_text(aes(label=name), size= 5/.pt) + scale_color_gradient(low='green', high='red')
+
+swperwiff <- ggplot(battingfinal, aes(x=swords, y=whiffs)) + geom_point(aes(colour= k/ab)) + geom_text(aes(label=name), size= 5/.pt) + scale_color_gradient(low='green', high='red')
+
+
+
+```
